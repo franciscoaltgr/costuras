@@ -1,17 +1,17 @@
 -- ==============================================================================
--- Sistema de Gestión para Taller de Costuras
+-- Sistema de Gestión para Taller de Costuras - Grill Guard
 -- Archivo: schema.sql
--- Motor: MySQL 8.x / MariaDB (InnoDB, UTF-8 con soporte en español)
+-- Motor: MySQL 8.x / MariaDB (InnoDB, UTF-8 con soporte completo en español)
 -- Moneda: Pesos Chilenos (CLP - sin decimales)
 -- ==============================================================================
 
 SET NAMES 'utf8mb4';
 SET CHARACTER SET utf8mb4;
 
--- Creación de la base de datos con juego de caracteres UTF-8 en español
+-- Creación de la base de datos con juego de caracteres UTF-8 profesional
 CREATE DATABASE IF NOT EXISTS `taller_costuras` 
 CHARACTER SET utf8mb4 
-COLLATE utf8mb4_spanish_ci;
+COLLATE utf8mb4_unicode_ci;
 
 USE `taller_costuras`;
 
@@ -20,6 +20,8 @@ SET NAMES 'utf8mb4';
 -- Desactivar temporalmente restricciones de llaves foráneas para reinicio limpio
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `cotizacion_items`;
+DROP TABLE IF EXISTS `cotizaciones`;
 DROP TABLE IF EXISTS `pagos`;
 DROP TABLE IF EXISTS `medidas`;
 DROP TABLE IF EXISTS `pedidos`;
@@ -38,7 +40,7 @@ CREATE TABLE `clientes` (
     `email` VARCHAR(100) NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_clientes_nombre` (`nombre`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
 -- 2. Tabla: pedidos
@@ -61,7 +63,7 @@ CREATE TABLE `pedidos` (
     INDEX `idx_pedidos_cliente` (`cliente_id`),
     INDEX `idx_pedidos_estado` (`estado`),
     INDEX `idx_pedidos_fecha_entrega` (`fecha_entrega`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
 -- 3. Tabla: medidas
@@ -80,7 +82,7 @@ CREATE TABLE `medidas` (
         ON DELETE CASCADE 
         ON UPDATE CASCADE,
     INDEX `idx_medidas_pedido` (`pedido_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
 -- 4. Tabla: pagos
@@ -97,7 +99,57 @@ CREATE TABLE `pagos` (
         ON UPDATE CASCADE,
     INDEX `idx_pagos_pedido` (`pedido_id`),
     INDEX `idx_pagos_fecha` (`fecha_pago`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- 5. Tabla: cotizaciones (Módulo Grill Guard)
+-- Registro de cotizaciones para clientes con desglose de IVA y condiciones de abono.
+-- ------------------------------------------------------------------------------
+CREATE TABLE `cotizaciones` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `numero` VARCHAR(50) NOT NULL UNIQUE,
+    `cliente_id` INT NULL,
+    `cliente_nombre` VARCHAR(150) NOT NULL,
+    `cliente_direccion` VARCHAR(255) NULL DEFAULT '',
+    `cliente_telefono` VARCHAR(50) NULL DEFAULT '',
+    `cliente_email` VARCHAR(150) NULL DEFAULT '',
+    `fecha` DATE NOT NULL,
+    `subtotal` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `iva` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `total` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `abono` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `saldo` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `porcentaje_abono` INT NOT NULL DEFAULT 50,
+    `condiciones` TEXT NULL,
+    `estado` ENUM('Borrador', 'Enviada', 'Aprobada', 'Rechazada', 'Convertida en Pedido') NOT NULL DEFAULT 'Enviada',
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_cotizaciones_cliente`
+        FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+    INDEX `idx_cotizaciones_numero` (`numero`),
+    INDEX `idx_cotizaciones_fecha` (`fecha`),
+    INDEX `idx_cotizaciones_estado` (`estado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- 6. Tabla: cotizacion_items
+-- Desglose por línea de productos / prendas cotizadas
+-- ------------------------------------------------------------------------------
+CREATE TABLE `cotizacion_items` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `cotizacion_id` INT NOT NULL,
+    `producto` VARCHAR(255) NOT NULL,
+    `color` VARCHAR(100) NULL DEFAULT '',
+    `cantidad` INT NOT NULL DEFAULT 1,
+    `precio_unitario` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    `total_linea` DECIMAL(12,0) NOT NULL DEFAULT 0,
+    CONSTRAINT `fk_cotizacion_items_cotizacion`
+        FOREIGN KEY (`cotizacion_id`) REFERENCES `cotizaciones` (`id`)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    INDEX `idx_cotizacion_items_cotizacion` (`cotizacion_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
 -- Datos Iniciales / Semilla (Seeders) con caracteres y acentos en español
@@ -137,3 +189,30 @@ INSERT INTO `medidas` (`pedido_id`, `busto`, `cintura`, `cadera`, `largo`, `obse
 INSERT INTO `pagos` (`pedido_id`, `monto`, `fecha_pago`) VALUES
 (3, 20000, DATE_SUB(NOW(), INTERVAL 3 DAY)),
 (3, 25000, NOW());
+
+-- Cotización Inicial: Factor Print (basada en cotización oficial Grill Guard #21126)
+INSERT INTO `cotizaciones` (
+    `id`, `numero`, `cliente_id`, `cliente_nombre`, `cliente_direccion`, 
+    `cliente_telefono`, `cliente_email`, `fecha`, `subtotal`, `iva`, 
+    `total`, `abono`, `saldo`, `porcentaje_abono`, `condiciones`, `estado`
+) VALUES (
+    1, 
+    '21126', 
+    NULL, 
+    'FACTOR PRINT', 
+    '', 
+    '56920838625', 
+    '', 
+    '2026-11-11', 
+    890000, 
+    169100, 
+    1059100, 
+    529550, 
+    529550, 
+    50, 
+    'TALLER SOLICITA 50% CON LA CONFIRMACION Y 50% CON LA ENTREGA', 
+    'Enviada'
+);
+
+INSERT INTO `cotizacion_items` (`cotizacion_id`, `producto`, `color`, `cantidad`, `precio_unitario`, `total_linea`) VALUES
+(1, 'BOLSAS 38X43', 'NEGRA', 1000, 890, 890000);

@@ -4,9 +4,17 @@
  * Archivo: conexion.php
  * 
  * Implementa conexión segura mediante PDO con manejo de excepciones (PDO::ERRMODE_EXCEPTION),
- * soporte completo para UTF-8 en español (utf8mb4_spanish_ci) y desactivación de emulación de sentencias preparadas para
+ * soporte completo para UTF-8 en español (utf8mb4_unicode_ci) y desactivación de emulación de sentencias preparadas para
  * garantizar seguridad frente a SQL Injection y atomicidad en transacciones ACID.
  */
+
+// Configuración profesional de codificación para PHP a nivel de entorno
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
+}
+mb_internal_encoding('UTF-8');
+mb_http_output('UTF-8');
+ini_set('default_charset', 'UTF-8');
 
 // Parámetros de configuración de la Base de Datos
 $dbHost    = getenv('DB_HOST') ?: 'localhost';
@@ -29,11 +37,13 @@ $options = [
     PDO::ATTR_EMULATE_PREPARES   => false,
     
     // Forzar collation y charset UTF-8 en español en la sesión MySQL
-    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_spanish_ci"
+    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
 
 try {
     $pdo = new PDO($dsn, $dbUser, $dbPass, $options);
+    $pdo->exec("SET NAMES 'utf8mb4'");
+    $pdo->exec("SET CHARACTER SET utf8mb4");
 } catch (PDOException $e) {
     http_response_code(500);
     ?>
@@ -41,7 +51,7 @@ try {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Error de Conexión - Taller de Costuras</title>
+        <title>Error de Conexión - Grill Guard</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     </head>
     <body class="bg-light d-flex align-items-center min-vh-100">
@@ -52,7 +62,7 @@ try {
                 </div>
                 <div class="card-body">
                     <p class="text-danger fw-bold">No se pudo establecer la conexión con MySQL mediante PDO.</p>
-                    <p><strong>Detalle del error:</strong> <?= htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p><strong>Detalle del error:</strong> <?= htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></p>
                     <hr>
                     <h6>Verificaciones sugeridas:</h6>
                     <ol class="small text-muted">

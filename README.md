@@ -1,185 +1,71 @@
-# Sistema de Gestión Monolítico para Taller de Costuras
+# Sistema de Gestión Monolítico para Taller de Costuras - Grill Guard
 
-Aplicación web monolítica desarrollada con **PHP 8 (PDO)** y **MySQL 8 (InnoDB)**, concebida bajo principios de ingeniería backend senior: **integridad referencial estricta, operaciones ACID mediante transacciones atómicas, prevención de inyecciones SQL nativas y una arquitectura limpia y mantenible**.
+Aplicación web desarrollada con **PHP 8 (PDO)** y **MySQL 8 (InnoDB)**, concebida bajo principios de ingeniería backend senior: **integridad referencial estricta, operaciones ACID mediante transacciones atómicas, prevención de inyecciones SQL nativas, manejo profesional de UTF-8 y un módulo oficial de cotizaciones con generación de PDF mediante librería open-source (FPDF)**.
 
 ---
 
 ## 1. Arquitectura y Estructura del Proyecto
 
-El proyecto sigue una estructura limpia que desacopla la configuración, la persistencia de datos, los componentes de interfaz reutilizables y los controladores/vistas de negocio:
+El proyecto sigue una estructura limpia que desacopla la configuración, la persistencia de datos, los componentes de interfaz reutilizables, los controladores de negocio y los generadores de documentos:
 
 ```text
-c:\laragon\www\costuras\
-├── config/                  # (Opcional) Archivos de configuración adicional
+c:\xampp\htdocs\costuras\
+├── assets/
+│   └── img/
+│       ├── logo_grill_guard.jpg       # Logo oficial Grill Guard extraído y optimizado
+│       └── cotizacion_ejemplo.jpg     # Muestra original del formato de cotización
 ├── database/
-│   └── schema.sql           # Definición DDL, restricciones foráneas y datos semilla
+│   ├── schema.sql                     # Definición DDL completa con cotizaciones y seeders UTF-8
+│   └── migracion_cotizaciones_y_charset.sql # Script de migración y saneamiento
 ├── includes/
-│   ├── header.php           # Encabezado HTML5, estilos Bootstrap 5 y barra de navegación
-│   ├── footer.php           # Cierre de contenedor, pie de página y scripts Bootstrap
-│   └── helpers.php          # Funciones auxiliares (prevención XSS, formateo de moneda/fechas, alertas flash)
-├── conexion.php             # Conexión centralizada PDO con manejo de excepciones y configuración segura
-├── schema.sql               # Script SQL en la raíz para importación rápida
-├── index.php                # Panel de control: listado de pedidos, filtros y balances financieros
-├── crear_pedido.php         # Transacción atómica: alta de cliente, orden, medidas y abono inicial
-├── ver_pedido.php           # Consulta detallada: cliente, especificaciones, medidas y bitácora de pagos
-├── actualizar_estado.php    # Transacción segura con bloqueo pesimista: cambio de estado y registro de abonos
-├── eliminar_pedido.php      # Eliminación atómica transaccional de pedidos y registros dependientes
-└── README.md                # Documentación técnica completa
+│   ├── header.php                     # Encabezado HTML5 con sticky layout, logo y menú Grill Guard
+│   ├── footer.php                     # Sticky footer "2026 grill guard" al final de todas las páginas
+│   ├── helpers.php                    # Funciones de escape XSS con ENT_SUBSTITUTE, CLP y fechas
+│   └── CotizacionPDF.php              # Clase generadora de PDF profesional basada en FPDF
+├── lib/
+│   └── fpdf/                          # Librería open-source FPDF 1.86 para generación de PDF en PHP
+├── conexion.php                       # Conexión centralizada PDO con UTF-8mb4 unicode y manejo de errores
+├── index.php                          # Panel de pedidos activos, filtros y balances financieros
+├── crear_pedido.php                   # Alta atómica: cliente, orden, medidas y abono inicial
+├── ver_pedido.php                     # Consulta detallada: cliente, prendas, medidas y pagos
+├── actualizar_estado.php              # Transacción con bloqueo pesimista: estado y abonos
+├── eliminar_pedido.php                # Eliminación atómica transaccional de pedidos
+├── cotizaciones.php                   # Módulo de cotizaciones: listado, filtros e indicadores
+├── nueva_cotizacion.php               # Formulario interactivo con cálculo dinámico de IVA (19%) y abonos
+├── ver_cotizacion.php                 # Vista de cotización con la estética oficial exacta y soporte de impresión
+├── generar_pdf_cotizacion.php         # Generación y descarga directa de PDF vectorial vía FPDF
+├── convertir_cotizacion_a_pedido.php  # Conversión directa de cotización a pedido activo de confección
+├── eliminar_cotizacion.php            # Eliminación segura de cotizaciones
+└── README.md                          # Documentación técnica completa
 ```
 
 ---
 
-## 2. Modelo Relacional de Base de Datos
+## 2. Puntos Clave de la Solución
 
-La base de datos utiliza el motor **InnoDB** con codificación **`utf8mb4`** y cotejamiento **`utf8mb4_unicode_ci`**.
+### A. Footer y Top Bar Grill Guard
+1. **Footer siempre al final:** Implementado con un diseño *Sticky Footer* usando Flexbox (`min-vh-100`, `flex-direction: column`, `flex-grow-1` en el contenedor `<main>` y `mt-auto` en el `<footer>`). Esto garantiza que el pie de página permanezca siempre anclado al fondo de la pantalla incluso si el contenido de la página es corto, y se desplace naturalmente en páginas extensas.
+2. **Texto del Footer:** Muestra exactamente `2026 grill guard`.
+3. **Top Bar Superior Izquierdo:** Incluye el isotipo/logo de Grill Guard junto al nombre oficial `Grill Guard | Taller de Costuras`.
+4. **Pestaña del Navegador:** `<title>` dinámico con el formato `[Título de Página] - Grill Guard | Taller de Costuras`.
 
-```mermaid
-erDiagram
-    CLIENTES ||--o{ PEDIDOS : "solicita (1:N)"
-    PEDIDOS ||--|| MEDIDAS : "posee (1:1)"
-    PEDIDOS ||--o{ PAGOS : "recibe (1:N)"
+### B. Corrección Profesional de Codificación UTF-8
+1. **Base de Datos y Tablas:** La base de datos y todas las tablas fueron convertidas a `utf8mb4` con cotejamiento `utf8mb4_unicode_ci`, soportando todos los acentos, tildes y caracteres especiales en español.
+2. **Sesión PDO en PHP:** La capa `conexion.php` define `charset=utf8mb4`, envía `SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'` en la inicialización y ejecuta `SET CHARACTER SET utf8mb4`.
+3. **Entorno PHP:** Se configuran `mb_internal_encoding('UTF-8')`, `mb_http_output('UTF-8')`, `ini_set('default_charset', 'UTF-8')` y la cabecera HTTP `Content-Type: text/html; charset=UTF-8`.
+4. **Escape Seguro:** La función `e()` utiliza `htmlspecialchars($val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')` para evitar pérdidas de contenido en secuencias no conformes.
+5. **Saneamiento de Registros:** Se repararon los registros existentes que tenían caracteres corruptos (`?` o `Ã¡`) convirtiéndolos a sus formas ortográficas correctas en español (`Gómez`, `Valenzuela`, `Díaz`, `francés`, `ilusión`, `Reducción`, `tacón`, `graduación`).
 
-    CLIENTES {
-        int id PK
-        varchar nombre
-        varchar telefono
-        varchar email
-        timestamp created_at
-    }
-
-    PEDIDOS {
-        int id PK
-        int cliente_id FK
-        varchar descripcion_prenda
-        enum estado
-        date fecha_entrega
-        decimal costo_total
-        decimal abono
-        timestamp created_at
-    }
-
-    MEDIDAS {
-        int id PK
-        int pedido_id FK
-        decimal busto
-        decimal cintura
-        decimal cadera
-        decimal largo
-        text observaciones
-    }
-
-    PAGOS {
-        int id PK
-        int pedido_id FK
-        decimal monto
-        timestamp fecha_pago
-    }
-```
-
-### Justificación de Restricciones y Llaves Foráneas:
-1. **`fk_pedidos_cliente` (`ON DELETE RESTRICT ON UPDATE CASCADE`)**:  
-   Impide eliminar un cliente de la base de datos si existen pedidos históricos asociados, resguardando la integridad fiscal y contable.
-2. **`fk_medidas_pedido` (`ON DELETE CASCADE ON UPDATE CASCADE`)**:  
-   Garantiza que la ficha de medidas no exista huérfana si un pedido es retirado del sistema.
-3. **`fk_pagos_pedido` (`ON DELETE RESTRICT ON UPDATE CASCADE`)**:  
-   Protege la bitácora contable impidiendo eliminaciones directas de pedidos con pagos sin un procedimiento transaccional supervisado.
-
----
-
-## 3. Lógica Transaccional e Integridad de Datos
-
-Todas las operaciones críticas se ejecutan dentro de bloques de transacción controlados con **PDO**:
-
-### A. Creación de Pedido (`crear_pedido.php`)
-Cuando se registra un encargo, el sistema realiza hasta 4 operaciones en una única unidad de trabajo indivisible:
-1. **Cliente:** Reutiliza un cliente existente validado o inserta uno nuevo en la tabla `clientes`.
-2. **Pedido:** Inserta la orden en `pedidos` con el `cliente_id` obtenido.
-3. **Medidas:** Inserta las medidas corporales en la tabla `medidas` usando el `pedido_id` generado (`$pdo->lastInsertId()`).
-4. **Pago Inicial:** Si el cliente dejó un abono inicial (`abono > 0`), se crea el asiento contable correspondiente en la tabla `pagos`.
-
-> Si alguna de estas sentencias falla (por error de red, fallo de restricción o dato inválido), el bloque `catch (Throwable $e)` invoca `$pdo->rollBack()`, cancelando todo y evitando registros huérfanos.
-
-### B. Registro de Pagos Parciales y Cambio de Estado (`actualizar_estado.php`)
-Para prevenir **condiciones de carrera** (Race Conditions) si dos operadores intentan registrar un pago simultáneamente:
-1. Se inicia la transacción `$pdo->beginTransaction()`.
-2. Se realiza un bloqueo pesimista de fila mediante `SELECT ... FOR UPDATE`:
-   ```sql
-   SELECT id, costo_total, abono, estado FROM pedidos WHERE id = :id FOR UPDATE;
-   ```
-3. Se valida que el nuevo monto no exceda el saldo pendiente real (`costo_total - abono`).
-4. Se registra el nuevo pago en la tabla `pagos`.
-5. Se actualiza el campo acumulado `abono` en la tabla `pedidos`.
-6. Si cambió el estado (`Pendiente`, `En Proceso`, `Prueba Lista`, `Entregado`, `Cancelado`), se actualiza en el mismo `commit()`.
-
----
-
-## 4. Medidas de Seguridad Implementadas
-
-- **Prevención de SQL Injection**:  
-  Uso de Sentencias Preparadas nativas (`PDO::ATTR_EMULATE_PREPARES => false`). Ningún parámetro proveniente de `$_GET` o `$_POST` se concatena directamente en las consultas SQL.
-- **Prevención de Cross-Site Scripting (XSS)**:  
-  Todas las cadenas impresas en las vistas HTML pasan por la función auxiliar `e()`, que ejecuta `htmlspecialchars($cadena, ENT_QUOTES, 'UTF-8')`.
-- **Validación Estricta de Tipos y Rangos**:  
-  Validaciones de formato decimal, validación de fechas con `strtotime` y comprobación de listas blancas (whitelisting) para los valores del tipo `ENUM`.
-- **Protección contra CSRF y Peticiones Accidentales**:  
-  Las operaciones destructivas (como `eliminar_pedido.php`) y de escritura exigen estrictamente el método `POST`.
-
----
-
-## 5. Instrucciones de Instalación y Puesta en Marcha
-
-### Prerrequisitos
-- Servidor local: **Laragon** (recomendado) o **XAMPP** con PHP 8.0+ y MySQL 8.0+ / MariaDB 10.4+.
-
-### Pasos de Despliegue:
-
-1. **Ubicación de los archivos**:
-   Coloca el proyecto en el directorio raíz de Laragon:
-   ```text
-   C:\laragon\www\costuras\
-   ```
-
-2. **Crear la Base de Datos e Importar el Esquema**:
-   - Abre Laragon y pulsa **"Iniciar todo"** (Apache y MySQL).
-   - Abre **HeidiSQL** (o phpMyAdmin en `http://localhost/phpmyadmin`).
-   - Abre el archivo [schema.sql](file:///c:/laragon/www/costuras/schema.sql) y ejecútalo.
-   - El script creará automáticamente la base de datos `taller_costuras`, las 4 tablas con sus relaciones y datos de prueba.
-
-   *Alternativa por consola MySQL:*
-   ```bash
-   mysql -u root -p < c:\laragon\www\costuras\schema.sql
-   ```
-
-3. **Verificar Configuración de Conexión**:
-   Revisa el archivo [conexion.php](file:///c:/laragon/www/costuras/conexion.php). Los valores predeterminados son compatibles con Laragon y XAMPP:
-   - Host: `localhost`
-   - Puerto: `3306`
-   - Base de Datos: `taller_costuras`
-   - Usuario: `root`
-   - Contraseña: `""` (vacía)
-
-4. **Acceder a la Aplicación**:
-   Abre tu navegador web en cualquiera de las siguientes URLs:
-   - **Con Laragon (Virtual Host automático):** `http://costuras.test`
-   - **Vía Localhost estándar:** `http://localhost/costuras/index.php`
-
----
-
-## 6. Verificación y Casos de Prueba Recomendados
-
-1. **Prueba de Creación con Nuevo Cliente y Abono**:
-   - Ingresa a `crear_pedido.php`.
-   - Selecciona "Registrar Nuevo Cliente", completa los datos, define un costo de `$150.000` y un abono inicial de `$50.000`.
-   - Presiona "Guardar Pedido".
-   - **Resultado esperado**: Se crean simultáneamente el cliente, el pedido con saldo pendiente de `$100.000`, la ficha de medidas y el primer registro en la tabla de pagos.
-
-2. **Prueba de Pago Parcial y Control de Saldo**:
-   - Accede a `actualizar_estado.php` sobre el pedido anterior.
-   - Intenta ingresar un monto de `$200.000` (superior al saldo de `$100.000`).
-   - **Resultado esperado**: La transacción se revierte con un mensaje de validación impidiendo cobros excesivos.
-   - Ahora ingresa un monto válido de `$50.000`.
-   - **Resultado esperado**: El saldo se actualiza a `$50.000` y se agrega la fila a la bitácora de pagos.
-
-3. **Prueba de Consulta y Filtros**:
-   - En `index.php`, utiliza la barra de filtros para segmentar por estados ("Activos", "Pendiente", "En Proceso", "Entregado").
-
+### C. Módulo de Cotizaciones Grill Guard
+1. **Ubicación en Navbar:** Acceso directo llamado **"Cotizaciones"** ubicado a la izquierda de "Listado de Pedidos".
+2. **Formato Fiel a la Muestra:** Reproducción exacta del membrete oficial con:
+   - Logo en relieve de Grill Guard.
+   - Datos del taller: Pecheras Parrilleras, +56 9 1013 1407, grillguardch@gmail.com, Rosas 1339 Santiago Centro, La Hermita 1556 Talca.
+   - Caja destacada en verde para el número de cotización (ej. `COTIZACION 21126`).
+   - Tabla de datos del cliente (Nombre, Dirección, Teléfono, Correo, Fecha).
+   - Cuadrícula de confección con cabeceras en tonos pastel (`DESCRIPCION`, `COLOR`, `CANTIDAD`, `UNITARIO`, `VALOR`).
+   - Bloque de totales: Subtotal Neto, IVA (19%), Total General, Abono (50%) y Saldo (50%).
+   - Nota al pie: `"TALLER SOLICITA 50% CON LA CONFIRMACION Y 50% CON LA ENTREGA"`.
+3. **Generación de PDF Open-Source (FPDF):** Implementado con **FPDF 1.86** (código abierto, sin dependencias externas pesadas, ultrarrápido y compatible con PHP 8.x). Permite abrir en línea o descargar el PDF vectorial idéntico al formato comercial.
+4. **Impresión Nativa:** Reglas CSS `@media print` para imprimir directamente o guardar como PDF desde el navegador ocultando barras y botones.
+5. **Flujo de Negocio:** Permite convertir con un solo clic una cotización aprobada en un pedido activo de confección en taller.
