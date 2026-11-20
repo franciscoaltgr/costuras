@@ -43,6 +43,15 @@ try {
             $descripcionPrenda = implode(', ', $descParts);
         }
 
+        // Abono REAL recibido al momento de la confirmación (puede diferir del proyectado en la cotización).
+        $costoTotal = (int)$cotizacion['total'];
+        $abonoRaw   = str_replace(['.', ','], ['', '.'], trim($_POST['abono_real'] ?? '0'));
+        $abono      = (int)round((float)$abonoRaw);
+        if ($abono < 0) { $abono = 0; }
+        if ($abono > $costoTotal) {
+            throw new Exception("El abono real (" . formatMoney($abono) . ") no puede superar el total del pedido (" . formatMoney($costoTotal) . ").");
+        }
+
         $pdo->beginTransaction();
 
         // 1. Obtener o crear el cliente
@@ -66,10 +75,7 @@ try {
             }
         }
 
-        // 2. Crear el pedido
-        $costoTotal = (int)$cotizacion['total'];
-        $abono      = (int)$cotizacion['abono'];
-
+        // 2. Crear el pedido (usa el abono REAL recibido, no el proyectado)
         $stmtPedido = $pdo->prepare("
             INSERT INTO pedidos (cliente_id, descripcion_prenda, estado, fecha_entrega, costo_total, abono)
             VALUES (:cliente_id, :descripcion_prenda, 'En Proceso', :fecha_entrega, :costo_total, :abono)
@@ -140,19 +146,26 @@ require_once __DIR__ . '/includes/header.php';
                     Esta acción ingresará formalmente la <strong>Cotización #<?= e($cotizacion['numero']); ?></strong> a la cola de trabajo del taller de costura, creando el pedido y registrando el abono acordado.
                 </p>
 
+                <?php
+                $totalCot        = (int)$cotizacion['total'];
+                $abonoProyectado = (int)$cotizacion['abono'];
+                $pctProyectado   = $totalCot > 0 ? (int)round($abonoProyectado / $totalCot * 100) : 0;
+                ?>
+
                 <div class="alert alert-light border mb-4">
                     <div class="row g-2">
                         <div class="col-sm-6">
                             <strong>Cliente:</strong> <?= e($cotizacion['cliente_nombre']); ?>
                         </div>
                         <div class="col-sm-6">
-                            <strong>Total Pedido:</strong> <?= formatMoney($cotizacion['total']); ?>
+                            <strong>Total Pedido:</strong> <?= formatMoney($totalCot); ?>
                         </div>
                         <div class="col-sm-6">
-                            <strong>Abono a Registrar:</strong> <?= formatMoney($cotizacion['abono']); ?> (50%)
+                            <strong>Abono proyectado en cotización:</strong>
+                            <?= formatMoney($abonoProyectado); ?> (<?= $pctProyectado; ?>%)
                         </div>
                         <div class="col-sm-6">
-                            <strong>Saldo Restante:</strong> <?= formatMoney($cotizacion['saldo']); ?>
+                            <strong>Saldo proyectado:</strong> <?= formatMoney($cotizacion['saldo']); ?>
                         </div>
                     </div>
                 </div>
@@ -160,7 +173,7 @@ require_once __DIR__ . '/includes/header.php';
                 <form method="POST">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Descripción del Trabajo en Taller <span class="text-danger">*</span></label>
-                        <?php 
+                        <?php
                         $descDefault = [];
                         foreach ($items as $it) {
                             $descDefault[] = "{$it['cantidad']}x {$it['producto']}" . (!empty($it['color']) ? " ({$it['color']})" : "");
@@ -175,6 +188,43 @@ require_once __DIR__ . '/includes/header.php';
                         <small class="text-muted">Fecha estimada para finalizar la confección.</small>
                     </div>
 
+                    <!-- Abono REAL recibido al confirmar: puede diferir del proyectado -->
+                    <div class="mb-4 p-3 border rounded bg-light">
+                        <label class="form-label fw-bold text-success mb-1">
+                            <i class="bi bi-cash-coin me-1"></i> ¿Cuánto abonó realmente el cliente al confirmar?
+                        </label>
+                        <div class="d-flex gap-1 flex-wrap mb-2" role="group" aria-label="Preselección de abono real">
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-amount="0">Sin abono aún</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="30">30%</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="50">50%</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-amount="<?= $abonoProyectado; ?>">
+                                Según cotización (<?= formatMoney($abonoProyectado); ?>)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="100">Pagó completo</button>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number"
+                                   name="abono_real"
+                                   id="inpAbonoReal"
+                                   class="form-control fw-bold"
+                                   min="0"
+                                   max="<?= $totalCot; ?>"
+                                   step="1"
+                                   value="<?= $abonoProyectado; ?>"
+                                   data-total="<?= $totalCot; ?>"
+                                   oninput="recalcularSaldoReal()" required>
+                            <span class="input-group-text" id="lblPctReal" style="min-width: 70px; justify-content: center;"><?= $pctProyectado; ?>%</span>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Prellenado con el abono proyectado. Ajústalo si la clienta pagó un monto distinto (o aún no ha pagado).
+                        </small>
+                        <div class="mt-2 small">
+                            Saldo pendiente a cobrar al entregar:
+                            <strong id="lblSaldoReal" class="text-danger"><?= formatMoney($totalCot - $abonoProyectado); ?></strong>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end gap-2">
                         <a href="ver_cotizacion.php?id=<?= (int)$cotizacion['id']; ?>" class="btn btn-outline-secondary">Cancelar</a>
                         <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm">
@@ -182,6 +232,38 @@ require_once __DIR__ . '/includes/header.php';
                         </button>
                     </div>
                 </form>
+
+                <script>
+                function formatCLP(val) {
+                    return '$ ' + Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                }
+                function recalcularSaldoReal() {
+                    const inp = document.getElementById('inpAbonoReal');
+                    const total = parseInt(inp.dataset.total, 10) || 0;
+                    let abono = Math.max(0, Math.round(parseFloat(inp.value) || 0));
+                    if (abono > total) { abono = total; inp.value = abono; }
+                    const saldo = total - abono;
+                    const pct = total > 0 ? Math.round((abono / total) * 100) : 0;
+                    document.getElementById('lblSaldoReal').textContent = formatCLP(saldo);
+                    document.getElementById('lblPctReal').textContent = pct + '%';
+                }
+                document.addEventListener('DOMContentLoaded', function() {
+                    const inp = document.getElementById('inpAbonoReal');
+                    const total = parseInt(inp.dataset.total, 10) || 0;
+                    document.querySelectorAll('.quick-abono').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            if (this.dataset.amount !== undefined) {
+                                inp.value = parseInt(this.dataset.amount, 10) || 0;
+                            } else if (this.dataset.pct !== undefined) {
+                                const pct = parseInt(this.dataset.pct, 10) || 0;
+                                inp.value = Math.round(total * (pct / 100));
+                            }
+                            recalcularSaldoReal();
+                        });
+                    });
+                    recalcularSaldoReal();
+                });
+                </script>
             </div>
         </div>
     </div>

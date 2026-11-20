@@ -36,7 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clienteTelefono  = trim($_POST['cliente_telefono'] ?? '');
     $clienteEmail     = trim($_POST['cliente_email'] ?? '');
     $fecha            = trim($_POST['fecha'] ?? date('Y-m-d'));
-    $porcentajeAbono  = (int)($_POST['porcentaje_abono'] ?? 50);
+    // Abono: ahora es un monto LIBRE en CLP que el usuario ingresa (no un porcentaje fijo).
+    // El porcentaje se recalcula a partir del monto para fines de reporte y del PDF.
+    $abonoRaw         = str_replace(['.', ','], ['', '.'], trim($_POST['abono'] ?? '0'));
+    $abonoManual      = (int)round((float)$abonoRaw);
+    if ($abonoManual < 0) { $abonoManual = 0; }
     $condiciones      = trim($_POST['condiciones'] ?? 'TALLER SOLICITA 50% CON LA CONFIRMACION Y 50% CON LA ENTREGA');
     $estado           = trim($_POST['estado'] ?? 'Enviada');
 
@@ -107,8 +111,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$error) {
         $ivaCalculado = (int)round($subtotalCalculado * 0.19);
         $totalGeneral = $subtotalCalculado + $ivaCalculado;
-        $abonoCalculado = (int)round($totalGeneral * ($porcentajeAbono / 100));
-        $saldoCalculado = $totalGeneral - $abonoCalculado;
+
+        // Validar que el abono manual no supere el total de la cotización
+        if ($abonoManual > $totalGeneral) {
+            $error = "El abono ingresado (" . formatMoney($abonoManual) . ") no puede ser mayor al total de la cotización (" . formatMoney($totalGeneral) . ").";
+        }
+    }
+
+    if (!$error) {
+        $abonoCalculado  = $abonoManual;
+        $saldoCalculado  = $totalGeneral - $abonoCalculado;
+        // Porcentaje derivado del monto real (0-100) para reportes y PDF
+        $porcentajeAbono = ($totalGeneral > 0) ? (int)round(($abonoCalculado / $totalGeneral) * 100) : 0;
 
         try {
             $pdo->beginTransaction();
@@ -328,9 +342,9 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <!-- SECCIÓN 4: Totales Financieros y Abono -->
+            <!-- SECCIÓN 4: Totales Financieros y Abono (editable) -->
             <div class="row justify-content-end mb-4">
-                <div class="col-md-6 col-lg-5">
+                <div class="col-md-7 col-lg-6">
                     <div class="card bg-light border-0 p-3">
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted fw-bold">TOTAL NETO:</span>
@@ -340,19 +354,41 @@ require_once __DIR__ . '/includes/header.php';
                             <span class="text-muted fw-bold">IVA (19%):</span>
                             <span class="fw-bold" id="lblIva">$ 169.100</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <div class="d-flex justify-content-between mb-3 pb-2 border-bottom">
                             <span class="fw-bold fs-6 text-dark">TOTAL GENERAL (c/IVA):</span>
                             <span class="fw-bold fs-6 text-primary" id="lblTotal">$ 1.059.100</span>
                         </div>
-                        
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-success">ABONO (50%):</span>
-                            <span class="fw-bold text-success fs-6" id="lblAbono">$ 529.550</span>
-                        </div>
 
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold text-danger">SALDO PENDIENTE (50%):</span>
-                            <span class="fw-bold text-danger fs-6" id="lblSaldo">$ 529.550</span>
+                        <!-- Abono recibido: monto libre en CLP con chips de preselección -->
+                        <label class="form-label fw-bold text-success mb-1">
+                            <i class="bi bi-cash-coin me-1"></i> Abono inicial recibido
+                        </label>
+                        <div class="d-flex gap-1 flex-wrap mb-2" role="group" aria-label="Selección rápida de abono">
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="0">Sin abono</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="30">30%</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="50">50%</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-abono" data-pct="100">Pagó completo</button>
+                        </div>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">$</span>
+                            <input type="number"
+                                   name="abono"
+                                   id="inpAbono"
+                                   class="form-control fw-bold"
+                                   min="0"
+                                   step="1"
+                                   value="<?= e($_POST['abono'] ?? 0); ?>"
+                                   placeholder="0"
+                                   oninput="recalcularAbono()">
+                            <span class="input-group-text" id="lblPctAbono" style="min-width: 70px; justify-content: center;">0%</span>
+                        </div>
+                        <small class="text-muted d-block mb-3">
+                            Ingresa el monto exacto que el cliente abonó al confirmar. Puede ser 0 si aún no ha pagado.
+                        </small>
+
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="fw-bold text-danger">SALDO PENDIENTE:</span>
+                            <span class="fw-bold text-danger fs-6" id="lblSaldo">$ 1.059.100</span>
                         </div>
                     </div>
                 </div>
@@ -399,6 +435,9 @@ function formatCLP(val) {
     return '$ ' + Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
+// Estado único de total vigente, usado tanto por las líneas como por el bloque de abono.
+let _totalActual = 0;
+
 function calcularTotales() {
     const tbody = document.getElementById('tbodyItems');
     const rows = tbody.querySelectorAll('tr');
@@ -420,14 +459,41 @@ function calcularTotales() {
 
     const iva = Math.round(subtotal * 0.19);
     const total = subtotal + iva;
-    const abono = Math.round(total * 0.50);
-    const saldo = total - abono;
+    _totalActual = total;
 
     document.getElementById('lblSubtotal').textContent = formatCLP(subtotal);
     document.getElementById('lblIva').textContent = formatCLP(iva);
     document.getElementById('lblTotal').textContent = formatCLP(total);
-    document.getElementById('lblAbono').textContent = formatCLP(abono);
+
+    // Si el abono supera el nuevo total (porque bajaron ítems), se re-acota
+    const inp = document.getElementById('inpAbono');
+    if (inp) {
+        inp.max = total;
+        if (parseFloat(inp.value || 0) > total) {
+            inp.value = total;
+        }
+    }
+    recalcularAbono();
+}
+
+function recalcularAbono() {
+    const inp = document.getElementById('inpAbono');
+    let abono = Math.max(0, Math.round(parseFloat(inp.value) || 0));
+    if (abono > _totalActual) {
+        abono = _totalActual;
+        inp.value = abono;
+    }
+    const saldo = _totalActual - abono;
+    const pct = _totalActual > 0 ? Math.round((abono / _totalActual) * 100) : 0;
+
     document.getElementById('lblSaldo').textContent = formatCLP(saldo);
+    document.getElementById('lblPctAbono').textContent = pct + '%';
+}
+
+function aplicarAbonoPorcentaje(pct) {
+    const monto = Math.round(_totalActual * (pct / 100));
+    document.getElementById('inpAbono').value = monto;
+    recalcularAbono();
 }
 
 function agregarFilaItem() {
@@ -470,6 +536,13 @@ function eliminarFilaItem(btn) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Conectar los chips de preselección (0% / 30% / 50% / 100%)
+    document.querySelectorAll('.quick-abono').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const pct = parseInt(this.dataset.pct, 10) || 0;
+            aplicarAbonoPorcentaje(pct);
+        });
+    });
     calcularTotales();
 });
 </script>

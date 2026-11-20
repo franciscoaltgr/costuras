@@ -8,6 +8,140 @@ if (!headers_sent()) {
 }
 require_once __DIR__ . '/helpers.php';
 $currentPage = basename($_SERVER['PHP_SELF']);
+
+/**
+ * Contenido de ayuda cariñosa por página.
+ * Se muestra en un modal al pulsar el botón "?" del navbar.
+ * El tono es cálido y directo — pensado para una mamita que recién aprende el sistema.
+ */
+$ayudaPorPagina = [
+    'index.php' => [
+        'titulo' => 'Listado de Pedidos',
+        'html'   => '
+            <p class="lead mb-3">Aquí ves todos los trabajos que tienes en el taller, mamita. 💐</p>
+            <ul class="mb-3">
+                <li><strong>Buscar:</strong> escribe el nombre de la clienta, la prenda o el teléfono en la barra de arriba y pulsa <em>Buscar</em>. Si no recuerdas el nombre completo, con que escribas un pedacito basta.</li>
+                <li><strong>Filtros por estado:</strong> los botones de abajo te dejan ver solo los que están en proceso, los entregados, los pendientes, etc.</li>
+                <li><strong>Paginación:</strong> se muestran de a 10 pedidos. Si tienes más, usa las flechitas de abajo para pasar página.</li>
+                <li><strong>Botón «Detalles»:</strong> abre la ficha completa con las medidas, los pagos y lo que acordaste con la clienta.</li>
+                <li><strong>Botón «Estado/Pago»:</strong> ahí marcas que el pedido avanzó (por ejemplo, de <em>Pendiente</em> a <em>En Proceso</em>) o registras un abono nuevo.</li>
+                <li><strong>Nuevo Pedido:</strong> el botón amarillo arriba a la derecha abre el formulario para anotar un trabajo nuevo.</li>
+            </ul>
+            <p class="small text-muted mb-0"><i class="bi bi-heart-fill text-danger me-1"></i> Si algo no te cuadra, tranquila: todo se puede corregir después.</p>
+        ',
+    ],
+    'crear_pedido.php' => [
+        'titulo' => 'Registrar Nuevo Pedido',
+        'html'   => '
+            <p class="lead mb-3">Esta pantalla sirve para anotar un pedido nuevo. Hazlo paso a paso, no hay prisa. 🧵</p>
+            <ol class="mb-3">
+                <li><strong>Clienta:</strong> si ya la tienes en la lista, escógela del menú. Si es nueva, marca <em>Registrar Nuevo Cliente</em> y llena su nombre y teléfono.</li>
+                <li><strong>Prenda / Trabajo:</strong> describe con tus palabras qué vas a confeccionar (ej.: «vestido de novia con encaje»).</li>
+                <li><strong>Estado y fecha:</strong> normalmente dejas <em>Pendiente</em> y pones la fecha en que prometes entregar.</li>
+                <li><strong>Costo y abono:</strong> escribe el costo total en pesos. Si la clienta ya te adelantó algo, anótalo en «Abono Inicial»; si todavía no te paga, deja 0.</li>
+                <li><strong>Medidas (opcional):</strong> si tomaste las medidas, anótalas en centímetros. Si no, puedes dejarlas vacías y agregarlas después.</li>
+            </ol>
+            <p class="small text-muted mb-0">Al apretar <em>Guardar Pedido</em>, se registra todo junto en el sistema (cliente, pedido, medidas y primer pago) de forma segura.</p>
+        ',
+    ],
+    'ver_pedido.php' => [
+        'titulo' => 'Detalles del Pedido',
+        'html'   => '
+            <p class="lead mb-3">Aquí ves toda la información del pedido en una sola pantalla. ✂️</p>
+            <ul class="mb-3">
+                <li><strong>Datos de la clienta y la prenda:</strong> arriba, para que recuerdes rápido quién es y qué pidió.</li>
+                <li><strong>Medidas:</strong> las que tomaste cuando ingresaste el pedido.</li>
+                <li><strong>Pagos:</strong> cada abono que te ha hecho la clienta aparece listado con su fecha.</li>
+                <li><strong>Saldo:</strong> lo que todavía te debe para terminar de cobrar.</li>
+            </ul>
+            <p class="small text-muted mb-0">Si quieres cambiar algo o anotar un pago nuevo, usa el botón <em>Actualizar Estado / Pago</em>.</p>
+        ',
+    ],
+    'actualizar_estado.php' => [
+        'titulo' => 'Actualizar Estado o Registrar Pago',
+        'html'   => '
+            <p class="lead mb-3">Desde aquí mueves el pedido entre etapas y anotas los pagos que te van llegando. 💰</p>
+            <ul class="mb-3">
+                <li><strong>Cambiar estado:</strong> cuando termines la prueba, marca <em>Prueba Lista</em>; cuando la clienta se lleve la prenda, <em>Entregado</em>.</li>
+                <li><strong>Registrar nuevo abono:</strong> escribe el monto en pesos y guarda. El saldo pendiente se recalcula automáticamente.</li>
+            </ul>
+            <p class="small text-muted mb-0">Cada cambio queda guardado con fecha y hora, así siempre puedes volver a revisar.</p>
+        ',
+    ],
+    'cotizaciones.php' => [
+        'titulo' => 'Cotizaciones',
+        'html'   => '
+            <p class="lead mb-3">Las cotizaciones son los presupuestos que le entregas a la clienta antes de empezar el trabajo. 📄</p>
+            <ul class="mb-3">
+                <li><strong>Buscar y filtrar:</strong> puedes buscar por número de cotización, nombre o teléfono. Y filtrar por estado (Enviadas, Aprobadas, En Taller).</li>
+                <li><strong>Icono ojo:</strong> ver la cotización en el formato bonito de Grill Guard.</li>
+                <li><strong>Icono PDF:</strong> abre o descarga el presupuesto en PDF para enviárselo a la clienta por WhatsApp o correo.</li>
+                <li><strong>Icono tijera:</strong> si la clienta aprueba, lo conviertes en un pedido de taller con un clic.</li>
+            </ul>
+            <p class="small text-muted mb-0">Las cotizaciones no afectan los pedidos hasta que las conviertas.</p>
+        ',
+    ],
+    'nueva_cotizacion.php' => [
+        'titulo' => 'Crear una Cotización',
+        'html'   => '
+            <p class="lead mb-3">Usa este formulario para preparar un presupuesto profesional en pocos minutos. 🧷</p>
+            <ol class="mb-3">
+                <li><strong>Número y fecha:</strong> el sistema sugiere el siguiente número; déjalo tal cual.</li>
+                <li><strong>Datos de la clienta:</strong> escoge si es nueva o ya existente.</li>
+                <li><strong>Prendas:</strong> agrega una fila por cada prenda con su cantidad y precio unitario. El total se calcula solo.</li>
+                <li><strong>Abono inicial recibido:</strong> si la clienta te adelantó algo, anótalo. Puedes usar los botones <em>30% · 50% · Pagó completo</em>, o escribir un monto exacto. Si no te ha pagado nada, deja 0.</li>
+                <li><strong>Guardar:</strong> al terminar, el sistema te lleva a la vista oficial y puedes descargar el PDF.</li>
+            </ol>
+        ',
+    ],
+    'ver_cotizacion.php' => [
+        'titulo' => 'Ver / Imprimir Cotización',
+        'html'   => '
+            <p class="lead mb-3">Aquí ves la cotización en el formato oficial, lista para imprimir o enviar a la clienta. 🖨️</p>
+            <ul class="mb-3">
+                <li><strong>Descargar PDF:</strong> genera el archivo bonito para enviar.</li>
+                <li><strong>Imprimir:</strong> usa la impresora de tu computador directamente.</li>
+                <li><strong>Convertir a Pedido:</strong> si la clienta aprueba, con un botón pasa al taller como pedido activo.</li>
+            </ul>
+        ',
+    ],
+    'convertir_cotizacion_a_pedido.php' => [
+        'titulo' => 'Convertir Cotización en Pedido',
+        'html'   => '
+            <p class="lead mb-3">La clienta aprobó la cotización — este paso la convierte en un pedido activo del taller. ✨</p>
+            <ol class="mb-3">
+                <li>Revisa la descripción del trabajo (puedes editarla).</li>
+                <li>Confirma la <strong>fecha de entrega</strong> prometida.</li>
+                <li>Anota el <strong>abono real</strong> que te dio la clienta al confirmar. Puedes dejar el que decía la cotización, usar los chips rápidos, o escribir el monto exacto.</li>
+                <li>Confirma. El pedido queda listo en la lista principal.</li>
+            </ol>
+        ',
+    ],
+    'eliminar_cotizacion.php' => [
+        'titulo' => 'Eliminar Cotización',
+        'html'   => '
+            <p class="lead mb-3">Esta acción borra la cotización y su desglose. No se puede deshacer, así que confirma solo cuando estés segura. 🗑️</p>
+        ',
+    ],
+    'eliminar_pedido.php' => [
+        'titulo' => 'Eliminar Pedido',
+        'html'   => '
+            <p class="lead mb-3">Borra un pedido del sistema. Ten cuidado: también se eliminan sus medidas y pagos asociados. 🗑️</p>
+        ',
+    ],
+];
+
+$ayudaActual = $ayudaPorPagina[$currentPage] ?? [
+    'titulo' => 'Ayuda general',
+    'html'   => '
+        <p class="lead mb-3">¡Hola mamita! Esta es tu aplicación del taller. 💐</p>
+        <ul class="mb-0">
+            <li><strong>Listado de Pedidos:</strong> todo lo que estás confeccionando.</li>
+            <li><strong>Cotizaciones:</strong> los presupuestos que le entregas a las clientas antes de empezar.</li>
+            <li><strong>Nuevo Pedido:</strong> botón amarillo arriba para anotar un trabajo nuevo.</li>
+        </ul>
+    ',
+];
 ?>
 <!DOCTYPE html>
 <html lang="es" class="h-100">
@@ -317,10 +451,72 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             outline-offset: 3px;
         }
 
+        /* ---------- Contenedor global ensanchado (más aire para las tablas) ---------- */
+        @media (min-width: 1200px) {
+            .container, .container-sm, .container-md,
+            .container-lg, .container-xl {
+                max-width: 1240px;
+            }
+        }
+        @media (min-width: 1400px) {
+            .container, .container-sm, .container-md,
+            .container-lg, .container-xl, .container-xxl {
+                max-width: 1360px;
+            }
+        }
+
+        /* ---------- Tablas: más holgura en cada celda ---------- */
+        .table > :not(caption) > * > * { padding-right: 1rem; padding-left: 1rem; }
+        .table-responsive { border-radius: var(--tc-radius-sm); }
+
+        /* ---------- Botón flotante de ayuda ---------- */
+        .btn-ayuda {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            background-color: var(--tc-gold);
+            color: #fff !important;
+            border: 2px solid rgba(255, 253, 249, 0.85);
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+            box-shadow: 0 3px 10px rgba(201, 162, 107, 0.35);
+            text-decoration: none !important;
+        }
+        .btn-ayuda:hover {
+            background-color: #B6914F;
+            transform: translateY(-2px) rotate(-6deg);
+            box-shadow: 0 6px 18px rgba(201, 162, 107, 0.45);
+            color: #fff !important;
+        }
+        .btn-ayuda:focus-visible {
+            outline: 3px solid rgba(255, 253, 249, 0.95);
+            outline-offset: 2px;
+        }
+
+        /* ---------- Modal de ayuda ---------- */
+        .modal-ayuda .modal-content {
+            border-radius: var(--tc-radius);
+            border: 1px solid var(--tc-border);
+        }
+        .modal-ayuda .modal-header {
+            background: linear-gradient(135deg, var(--tc-plum) 0%, var(--tc-plum-dark) 100%);
+            color: #fff;
+            border-bottom: 0;
+        }
+        .modal-ayuda .modal-header .btn-close { filter: invert(1) brightness(1.4); }
+        .modal-ayuda .modal-body { font-size: 1.02rem; line-height: 1.65; }
+        .modal-ayuda .lead { color: var(--tc-charcoal); }
+        .modal-ayuda ul li, .modal-ayuda ol li { margin-bottom: .45rem; }
+
         /* ---------- Responsive ---------- */
         @media (max-width: 575.98px) {
             html { font-size: 16px; }
             .navbar-brand { font-size: 1.15rem; }
+            .btn-ayuda { width: 38px; height: 38px; font-size: 1.05rem; }
         }
     </style>
 </head>
@@ -354,9 +550,42 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                             <i class="bi bi-plus-circle-fill"></i> Nuevo Pedido
                         </a>
                     </li>
+                    <li class="nav-item ms-lg-2">
+                        <button type="button"
+                                class="btn-ayuda"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalAyuda"
+                                title="¿Cómo se usa esta página?"
+                                aria-label="Ayuda">
+                            ?
+                        </button>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
+
+    <!-- Modal de Ayuda cariñosa (contextual por página) -->
+    <div class="modal fade modal-ayuda" id="modalAyuda" tabindex="-1" aria-labelledby="modalAyudaTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalAyudaTitulo">
+                        <i class="bi bi-patch-question-fill me-2"></i>
+                        <?= e($ayudaActual['titulo']); ?>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <?= $ayudaActual['html']; ?>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <small class="text-muted"><i class="bi bi-flower1 me-1" style="color: var(--tc-plum);"></i> Siempre que tengas dudas, vuelve a pulsar «?»</small>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido, gracias</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <main class="container mb-5 flex-grow-1">
         <?= renderFlash(); ?>
