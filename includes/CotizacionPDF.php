@@ -237,25 +237,32 @@ class CotizacionPDF extends FPDF {
         $wTotVal   = 40;
         $xTot = 15 + (180 - ($wTotLabel + $wTotVal)); // 15 + 112 = 127
 
-        // TOTAL NETO
-        $this->SetX($xTot);
-        $this->SetFont('Arial', 'B', 9);
-        $this->Cell($wTotLabel, 6.5, $this->u('TOTAL'), 1, 0, 'R');
-        $this->SetFont('Arial', 'B', 9.5);
-        $this->Cell($wTotVal, 6.5, $this->money($this->cotizacion['subtotal']) . ' ', 1, 1, 'R');
+        // Si la cotización es exenta (iva = 0) la clienta NO debe notarlo:
+        // se omiten las filas de subtotal e IVA y se muestra un único renglón "TOTAL".
+        $esExento = ((int)$this->cotizacion['iva']) === 0;
 
-        // IVA 19%
-        $this->SetX($xTot);
-        $this->SetFont('Arial', 'B', 9);
-        $this->Cell($wTotLabel, 6.5, $this->u('IVA (19%)'), 1, 0, 'R');
-        $this->SetFont('Arial', '', 9.5);
-        $this->Cell($wTotVal, 6.5, $this->money($this->cotizacion['iva']) . ' ', 1, 1, 'R');
+        if (!$esExento) {
+            // TOTAL NETO
+            $this->SetX($xTot);
+            $this->SetFont('Arial', 'B', 9);
+            $this->Cell($wTotLabel, 6.5, $this->u('TOTAL'), 1, 0, 'R');
+            $this->SetFont('Arial', 'B', 9.5);
+            $this->Cell($wTotVal, 6.5, $this->money($this->cotizacion['subtotal']) . ' ', 1, 1, 'R');
 
-        // SALDO TOTAL / TOTAL CON IVA
+            // IVA 19%
+            $this->SetX($xTot);
+            $this->SetFont('Arial', 'B', 9);
+            $this->Cell($wTotLabel, 6.5, $this->u('IVA (19%)'), 1, 0, 'R');
+            $this->SetFont('Arial', '', 9.5);
+            $this->Cell($wTotVal, 6.5, $this->money($this->cotizacion['iva']) . ' ', 1, 1, 'R');
+        }
+
+        // TOTAL FINAL — mismo formato tanto en afecto como en exento (para que no se note)
         $this->SetX($xTot);
         $this->SetFont('Arial', 'B', 9);
         $this->SetFillColor(245, 245, 245);
-        $this->Cell($wTotLabel, 7, $this->u('TOTAL C/IVA'), 1, 0, 'R', true);
+        $labelTotal = $esExento ? 'TOTAL' : 'TOTAL C/IVA';
+        $this->Cell($wTotLabel, 7, $this->u($labelTotal), 1, 0, 'R', true);
         $this->SetFont('Arial', 'B', 10);
         $this->Cell($wTotVal, 7, $this->money($this->cotizacion['total']) . ' ', 1, 1, 'R', true);
 

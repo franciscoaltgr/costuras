@@ -36,6 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clienteTelefono  = trim($_POST['cliente_telefono'] ?? '');
     $clienteEmail     = trim($_POST['cliente_email'] ?? '');
     $fecha            = trim($_POST['fecha'] ?? date('Y-m-d'));
+    // Toggle "Afecto a IVA": si se desactiva, la cotización se emite SIN IVA (venta exenta).
+    // Se usa iva = 0 como señal de exento al almacenar. El form envía valor '1' solo si está activo.
+    $afectoIva        = isset($_POST['afecto_iva']) && $_POST['afecto_iva'] === '1';
     // Abono: ahora es un monto LIBRE en CLP que el usuario ingresa (no un porcentaje fijo).
     // El porcentaje se recalcula a partir del monto para fines de reporte y del PDF.
     $abonoRaw         = str_replace(['.', ','], ['', '.'], trim($_POST['abono'] ?? '0'));
@@ -109,7 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$error) {
-        $ivaCalculado = (int)round($subtotalCalculado * 0.19);
+        // Si la cotización es EXENTA (sin boleta/factura), IVA = 0 y total = subtotal
+        $ivaCalculado = $afectoIva ? (int)round($subtotalCalculado * 0.19) : 0;
         $totalGeneral = $subtotalCalculado + $ivaCalculado;
 
         // Validar que el abono manual no supere el total de la cotización
@@ -343,19 +347,43 @@ require_once __DIR__ . '/includes/header.php';
             </div>
 
             <!-- SECCIÓN 4: Totales Financieros y Abono (editable) -->
+            <?php $afectoIvaDefault = !isset($_POST['afecto_iva']) || $_POST['afecto_iva'] === '1'; ?>
             <div class="row justify-content-end mb-4">
                 <div class="col-md-7 col-lg-6">
                     <div class="card bg-light border-0 p-3">
+
+                        <!-- Toggle: afecto a IVA (19%) -->
+                        <div class="form-check form-switch p-3 mb-3 rounded border bg-white" style="padding-left: 3.5rem !important;">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   role="switch"
+                                   id="toggleIva"
+                                   name="afecto_iva"
+                                   value="1"
+                                   <?= $afectoIvaDefault ? 'checked' : ''; ?>
+                                   onchange="calcularTotales()">
+                            <label class="form-check-label fw-bold" for="toggleIva">
+                                <i class="bi bi-receipt me-1"></i>
+                                Afecto a IVA (19%)
+                                <span id="lblEstadoIva" class="badge ms-2 <?= $afectoIvaDefault ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'; ?>">
+                                    <?= $afectoIvaDefault ? 'con boleta / factura' : 'exento — sin boleta'; ?>
+                                </span>
+                            </label>
+                            <small class="d-block text-muted mt-1">
+                                Desactívalo si la clienta no desea boleta ni factura (venta exenta de IVA).
+                            </small>
+                        </div>
+
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted fw-bold">TOTAL NETO:</span>
                             <span class="fw-bold" id="lblSubtotal">$ 890.000</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted fw-bold">IVA (19%):</span>
+                        <div class="d-flex justify-content-between mb-2" id="rowIva">
+                            <span class="text-muted fw-bold" id="lblIvaLabel">IVA (19%):</span>
                             <span class="fw-bold" id="lblIva">$ 169.100</span>
                         </div>
                         <div class="d-flex justify-content-between mb-3 pb-2 border-bottom">
-                            <span class="fw-bold fs-6 text-dark">TOTAL GENERAL (c/IVA):</span>
+                            <span class="fw-bold fs-6 text-dark" id="lblTotalLabel">TOTAL GENERAL (c/IVA):</span>
                             <span class="fw-bold fs-6 text-primary" id="lblTotal">$ 1.059.100</span>
                         </div>
 
@@ -457,13 +485,37 @@ function calcularTotales() {
         }
     });
 
-    const iva = Math.round(subtotal * 0.19);
+    // Respetar el toggle "Afecto a IVA" (si está desactivado → venta exenta → IVA = 0)
+    const toggleIva = document.getElementById('toggleIva');
+    const afectoIva = toggleIva ? toggleIva.checked : true;
+    const iva = afectoIva ? Math.round(subtotal * 0.19) : 0;
     const total = subtotal + iva;
     _totalActual = total;
 
     document.getElementById('lblSubtotal').textContent = formatCLP(subtotal);
-    document.getElementById('lblIva').textContent = formatCLP(iva);
+    document.getElementById('lblIva').textContent = afectoIva ? formatCLP(iva) : 'Exento';
     document.getElementById('lblTotal').textContent = formatCLP(total);
+
+    // Feedback visual del estado del IVA
+    const lblIvaLabel   = document.getElementById('lblIvaLabel');
+    const lblTotalLabel = document.getElementById('lblTotalLabel');
+    const rowIva        = document.getElementById('rowIva');
+    const lblEstadoIva  = document.getElementById('lblEstadoIva');
+    if (lblIvaLabel && lblTotalLabel && rowIva && lblEstadoIva) {
+        if (afectoIva) {
+            lblIvaLabel.textContent = 'IVA (19%):';
+            lblTotalLabel.textContent = 'TOTAL GENERAL (c/IVA):';
+            rowIva.classList.remove('text-muted', 'opacity-50');
+            lblEstadoIva.textContent = 'con boleta / factura';
+            lblEstadoIva.className = 'badge ms-2 bg-success-subtle text-success';
+        } else {
+            lblIvaLabel.textContent = 'IVA:';
+            lblTotalLabel.textContent = 'TOTAL GENERAL (exento):';
+            rowIva.classList.add('opacity-50');
+            lblEstadoIva.textContent = 'exento — sin boleta';
+            lblEstadoIva.className = 'badge ms-2 bg-warning-subtle text-warning';
+        }
+    }
 
     // Si el abono supera el nuevo total (porque bajaron ítems), se re-acota
     const inp = document.getElementById('inpAbono');

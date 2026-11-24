@@ -89,6 +89,7 @@ $ayudaPorPagina = [
                 <li><strong>Número y fecha:</strong> el sistema sugiere el siguiente número; déjalo tal cual.</li>
                 <li><strong>Datos de la clienta:</strong> escoge si es nueva o ya existente.</li>
                 <li><strong>Prendas:</strong> agrega una fila por cada prenda con su cantidad y precio unitario. El total se calcula solo.</li>
+                <li><strong>¿Lleva boleta o factura?</strong> normalmente sí — déjalo activado y se suma el IVA (19%). Si la clienta prefiere pagar sin boleta, desactiva el interruptor «Afecto a IVA» y la cotización se emite como exenta.</li>
                 <li><strong>Abono inicial recibido:</strong> si la clienta te adelantó algo, anótalo. Puedes usar los botones <em>30% · 50% · Pagó completo</em>, o escribir un monto exacto. Si no te ha pagado nada, deja 0.</li>
                 <li><strong>Guardar:</strong> al terminar, el sistema te lleva a la vista oficial y puedes descargar el PDF.</li>
             </ol>

@@ -290,17 +290,20 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
         <div class="col-6">
+            <?php $esExento = ((int)$cotizacion['iva']) === 0; ?>
             <table class="table-totales">
-                <tr>
-                    <td class="label-tot">TOTAL</td>
-                    <td class="val-tot"><?= formatMoney($cotizacion['subtotal']); ?></td>
-                </tr>
-                <tr>
-                    <td class="label-tot">IVA</td>
-                    <td class="val-tot"><?= formatMoney($cotizacion['iva']); ?></td>
-                </tr>
+                <?php if (!$esExento): ?>
+                    <tr>
+                        <td class="label-tot">TOTAL</td>
+                        <td class="val-tot"><?= formatMoney($cotizacion['subtotal']); ?></td>
+                    </tr>
+                    <tr>
+                        <td class="label-tot">IVA (19%)</td>
+                        <td class="val-tot"><?= formatMoney($cotizacion['iva']); ?></td>
+                    </tr>
+                <?php endif; ?>
                 <tr style="background-color: #f7f7f7;">
-                    <td class="label-tot">SALDO</td>
+                    <td class="label-tot"><?= $esExento ? 'TOTAL' : 'TOTAL C/IVA'; ?></td>
                     <td class="val-tot text-primary"><?= formatMoney($cotizacion['total']); ?></td>
                 </tr>
                 <tr>
